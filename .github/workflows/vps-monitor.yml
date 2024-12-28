@@ -2,15 +2,15 @@ name: VPS Status Monitor
 
 on:
   schedule:
-    - cron: '*/5 * * * *'
-  workflow_dispatch:
+    - cron: '*/5 * * * *'  # Run every 5 minutes
+  workflow_dispatch:  # Allow manual triggering
 
 jobs:
   check-vps-status:
     runs-on: ubuntu-latest
     
     permissions:
-      contents: write
+      contents: write  # Give write permissions
 
     steps:
     - uses: actions/checkout@v3
@@ -25,7 +25,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install requests urllib3
 
-    - name: Check VPS Status
+    - name: Verbose VPS Status Check
       env:
         SG_VPS_URL: ${{ secrets.SG_VPS_URL }}
         US_VPS_URL: ${{ secrets.US_VPS_URL }}
@@ -35,29 +35,47 @@ jobs:
         import json
         from datetime import datetime
         import os
-        import ssl
         import socket
+        import ssl
+        import traceback
+        from urllib.parse import urlparse
 
         def advanced_vps_status_check(url):
+            print(f"\nChecking URL: {url}")
             try:
-                # Detailed status checking
+                # Parse URL
+                parsed_url = urlparse(url)
+                host = parsed_url.hostname
+                port = parsed_url.port or (443 if parsed_url.scheme == 'https' else 80)
+
+                # Detailed logging
+                print(f"Parsed Host: {host}")
+                print(f"Parsed Port: {port}")
+
+                # DNS Resolution
                 try:
-                    # Disable SSL verification for self-signed certificates
+                    ip_addresses = socket.gethostbyname_ex(host)
+                    print(f"Resolved IPs: {ip_addresses}")
+                except Exception as dns_err:
+                    print(f"DNS Resolution Error: {dns_err}")
+
+                # Socket Connection Test
+                try:
+                    # Create SSL context
                     ssl_context = ssl.create_default_context()
                     ssl_context.check_hostname = False
-                    ssl_context.verify_mode = ssl.CERT_NONE
+                 ssl_context.verify_mode = ssl.CERT_NONE
 
-                    # Extract host and port
-                    from urllib.parse import urlparse
-                    parsed_url = urlparse(url)
-                    host = parsed_url.hostname
-                    port = parsed_url.port or (443 if parsed_url.scheme == 'https' else 80)
-
-                    # Socket connection test
-                    sock = socket.create_connection((host, port), timeout=10)
-                    sock.close()
-                except (socket.error, socket.timeout) as socket_err:
+                    # Socket connection
+                    with socket.create_connection((host, port), timeout=10) as sock:
+                        if parsed_url.scheme == 'https':
+                            with ssl_context.wrap_socket(sock, server_hostname=host):
+                                print("Socket Connection Successful (HTTPS)")
+                        else:
+                            print("Socket Connection Successful (HTTP)")
+                except Exception as socket_err:
                     print(f"Socket Connection Error: {socket_err}")
+                    traceback.print_exc()
                     return {
                         'status': False,
                         'uptime': f'Socket Error: {socket_err}',
@@ -65,15 +83,19 @@ jobs:
                         'error_details': str(socket_err)
                     }
 
-                # HTTP Request Test
+                # Comprehensive HTTP Request
                 try:
-                    # Comprehensive request with multiple checks
                     response = requests.head(
                         url, 
                         timeout=10, 
                         verify=False,  # Disable SSL verification
                         allow_redirects=True
                     )
+
+                    print(f"HTTP Status Code: {response.status_code}")
+                    print("Response Headers:")
+                    for key, value in response.headers.items():
+                        print(f"  {key}: {value}")
 
                     # Detailed status evaluation
                     return {
@@ -84,6 +106,7 @@ jobs:
                     }
                 except requests.RequestException as req_err:
                     print(f"HTTP Request Error: {req_err}")
+                    traceback.print_exc()
                     return {
                         'status': False,
                         'uptime': f'Request Error: {req_err}',
@@ -93,6 +116,7 @@ jobs:
 
             except Exception as general_err:
                 print(f"Unexpected Error: {general_err}")
+                traceback.print_exc()
                 return {
                     'status': False,
                     'uptime': f'Unexpected Error: {general_err}',
@@ -100,22 +124,13 @@ jobs:
                     'error_details': str(general_err)
                 }
 
-        # Suppress SSL warnings
-        import urllib3
-        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
         # Get URLs from environment variables
         sg_url = os.environ.get('SG_VPS_URL')
         us_url = os.environ.get('US_VPS_URL')
 
         # Check VPS status with detailed logging
-        print(f"Checking Singapore VPS: {sg_url}")
         sg_status = advanced_vps_status_check(sg_url)
-        print(f"Singapore VPS Status: {sg_status}")
-
-        print(f"Checking US VPS: {us_url}")
         us_status = advanced_vps_status_check(us_url)
-        print(f"US VPS Status: {us_status}")
 
         # Prepare status dictionary
         status = {
