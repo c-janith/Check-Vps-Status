@@ -2,13 +2,17 @@ name: VPS Status Monitor
 
 on:
   schedule:
-    - cron: '*/5 * * * *'  # Every 5 minutes
-  workflow_dispatch:  # Manual trigger
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
 
 jobs:
   check-vps-status:
     runs-on: ubuntu-latest
     
+    permissions:
+      # Give the default GITHUB_TOKEN write permission
+      contents: write
+
     steps:
     - uses: actions/checkout@v3
     
@@ -17,51 +21,32 @@ jobs:
       with:
         python-version: '3.9'
     
-    - name: Install Dependencies
-      run: pip install requests
-
     - name: Check VPS Status
       env:
         SG_VPS_URL: ${{ secrets.SG_VPS_URL }}
         US_VPS_URL: ${{ secrets.US_VPS_URL }}
       run: |
+        pip install requests
+        
         python3 - << EOF
         import requests
         import json
         from datetime import datetime
         import os
-        import socket
-        import urllib3
-
-        # Disable SSL warnings if needed
-        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
         def check_vps_status(url):
             try:
-                # More comprehensive check
-                response = requests.head(
-                    url, 
-                    timeout=10, 
-                    verify=False,  # Use carefully
-                    allow_redirects=True
-                )
-                
-                # Additional network checks
-                parsed_url = urllib3.util.parse_url(url)
-                socket.gethostbyname(parsed_url.host)
-
+                response = requests.head(url, timeout=10)
                 return {
                     'status': response.status_code == 200,
-                    'uptime': 'Network Accessible',
-                    'last_checked': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                    'response_code': response.status_code
+                    'uptime': 'Checked Successfully',
+                    'last_checked': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 }
             except Exception as e:
                 return {
                     'status': False,
-                    'uptime': f'Error: {str(e)}',
-                    'last_checked': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                    'error_details': repr(e)
+                    'uptime': str(e),
+                    'last_checked': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 }
 
         # Get URLs from environment variables
@@ -80,9 +65,12 @@ jobs:
         EOF
 
     - name: Commit and Push Changes
+      # Use GITHUB_TOKEN for authentication
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
+        git config user.name github-actions
+        git config user.email github-actions@github.com
         git add vps_status.json
         git commit -m "Update VPS status" || echo "No changes to commit"
         git push
