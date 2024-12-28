@@ -108,43 +108,43 @@
         </div>
 
         <div style="text-align: center; margin-top: 20px;">
-            <div id="refreshCountdown" class="refresh-countdown">Next refresh in 30 seconds</div>
+            <div id="refreshCountdown" class="refresh-countdown">Next check in 5 minutes</div>
         </div>
     </div>
 
     <script>
-        // Replace with your GitHub username and repository name
+        // GitHub raw URL for your specific repository
         const STATUS_API_URL = 'https://raw.githubusercontent.com/c-janith/Check-Vps-Status/main/vps_status.json';
-        const REFRESH_INTERVAL = 30; // seconds
+        
+        // Workflow runs every 5 minutes
+        const TOTAL_SECONDS = 5 * 60; // 5 minutes in seconds
 
-        let countdownInterval;
+        function formatTimeRemaining(seconds) {
+            const minutes = Math.floor(seconds / 60);
+            const remainingSeconds = seconds % 60;
+            return `Next check in ${minutes} min ${remainingSeconds.toString().padStart(2, '0')} sec`;
+        }
 
         function startCountdown() {
-            let timeLeft = REFRESH_INTERVAL;
             const countdownEl = document.getElementById('refreshCountdown');
+            let timeLeft = TOTAL_SECONDS;
 
             // Clear any existing interval
-            if (countdownInterval) {
-                clearInterval(countdownInterval);
+            if (window.countdownInterval) {
+                clearInterval(window.countdownInterval);
             }
 
-            // Update countdown immediately
-            countdownEl.textContent = `Next refresh in ${timeLeft} seconds`;
+            // Initial update
+            countdownEl.textContent = formatTimeRemaining(timeLeft);
 
             // Start countdown
-            countdownInterval = setInterval(() => {
+            window.countdownInterval = setInterval(() => {
                 timeLeft--;
                 
                 if (timeLeft > 0) {
-                    countdownEl.textContent = `Next refresh in ${timeLeft} seconds`;
+                    countdownEl.textContent = formatTimeRemaining(timeLeft);
                 } else {
-                    countdownEl.textContent = 'Refreshing...';
-                }
-
-                // When countdown reaches 0, refresh and restart
-                if (timeLeft <= 0) {
-                    checkVPSStatus();
-                    timeLeft = REFRESH_INTERVAL;
+                    countdownEl.textContent = 'Checking...';
                 }
             }, 1000);
         }
@@ -176,13 +176,13 @@
                 usUptimeEl.textContent = `Details: ${data.us.uptime}`;
                 usLastCheckedEl.textContent = `Last Checked: ${data.us.last_checked}`;
 
-                // Restart countdown after successful refresh
+                // Restart countdown
                 startCountdown();
 
             } catch (error) {
                 console.error('Error fetching VPS status:', error);
                 
-                // Even if there's an error, restart the countdown
+                // Restart countdown even on error
                 startCountdown();
             }
         }
