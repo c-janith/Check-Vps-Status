@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VPS Status Monitor</title>
+    <style>
+        :root {
+            --bg-primary: #121212;
+            --bg-secondary: #1e1e1e;
+            --text-primary: #e0e0e0;
+            --text-secondary: #b0b0b0;
+            --online-color: #4caf50;
+            --offline-color: #f44336;
+            --card-bg: #2a2a2a;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1200px;
+            padding: 20px;
+        }
+
+        .status-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+        }
+
+        .status-box {
+            background-color: var(--card-bg);
+            border-radius: 15px;
+            padding: 25px;
+            width: calc(50% - 20px);
+            min-width: 300px;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+        }
+
+        .status-label {
+            color: var(--text-secondary);
+            margin-bottom: 10px;
+            font-size: 1.2rem;
+        }
+
+        .status-value {
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+
+        .online { color: var(--online-color); }
+        .offline { color: var(--offline-color); }
+
+        @media (max-width: 768px) {
+            .status-box {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 style="text-align: center; margin-bottom: 20px;">VPS Status Monitor</h1>
+        
+        <div class="status-container">
+            <div class="status-box">
+                <h2 class="status-label">Singapore VPS</h2>
+                <div id="sgStatus" class="status-value">Checking...</div>
+                <div id="sgUptime" class="status-value"></div>
+                <div id="sgLastChecked" class="status-value" style="font-size: 0.8rem; color: var(--text-secondary);"></div>
+            </div>
+            
+            <div class="status-box">
+                <h2 class="status-label">US VPS</h2>
+                <div id="usStatus" class="status-value">Checking...</div>
+                <div id="usUptime" class="status-value"></div>
+                <div id="usLastChecked" class="status-value" style="font-size: 0.8rem; color: var(--text-secondary);"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // GitHub Pages will serve this from the raw.githubusercontent.com URL
+        const STATUS_API_URL = 'https://raw.githubusercontent.com/c-janith/Check-Vps-Status/main/vps_status.json';
+
+        async function checkVPSStatus() {
+            try {
+                // Fetch status from GitHub-hosted JSON file
+                const response = await fetch(STATUS_API_URL, { 
+                    cache: 'no-store' // Prevent caching
+                });
+                const data = await response.json();
+
+                // Update Singapore VPS
+                const sgStatusEl = document.getElementById('sgStatus');
+                const sgUptimeEl = document.getElementById('sgUptime');
+                const sgLastCheckedEl = document.getElementById('sgLastChecked');
+                
+                sgStatusEl.textContent = data.singapore.status ? 'Online' : 'Offline';
+                sgStatusEl.className = `status-value ${data.singapore.status ? 'online' : 'offline'}`;
+                sgUptimeEl.textContent = `Uptime: ${data.singapore.uptime}`;
+                sgLastCheckedEl.textContent = `Last Checked: ${data.singapore.last_checked}`;
+
+                // Update US VPS
+                const usStatusEl = document.getElementById('usStatus');
+                const usUptimeEl = document.getElementById('usUptime');
+                const usLastCheckedEl = document.getElementById('usLastChecked');
+                
+                usStatusEl.textContent = data.us.status ? 'Online' : 'Offline';
+                usStatusEl.className = `status-value ${data.us.status ? 'online' : 'offline'}`;
+                usUptimeEl.textContent = `Uptime: ${data.us.uptime}`;
+                usLastCheckedEl.textContent = `Last Checked: ${data.us.last_checked}`;
+
+            } catch (error) {
+                console.error('Error fetching VPS status:', error);
+            }
+        }
+
+        // Initial check
+        checkVPSStatus();
+
+        // Periodic check every 30 seconds
+        setInterval(checkVPSStatus, 30000);
+    </script>
+</body>
+</html>
