@@ -53,6 +53,11 @@
             min-width: 300px;
             text-align: center;
             box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+            transition: transform 0.3s ease;
+        }
+
+        .status-box:hover {
+            transform: scale(1.05);
         }
 
         .status-label {
@@ -70,6 +75,12 @@
         .online { color: var(--online-color); }
         .offline { color: var(--offline-color); }
 
+        .last-checked {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-top: 10px;
+        }
+
         @media (max-width: 768px) {
             .status-box {
                 width: 100%;
@@ -86,21 +97,21 @@
                 <h2 class="status-label">Singapore VPS</h2>
                 <div id="sgStatus" class="status-value">Checking...</div>
                 <div id="sgUptime" class="status-value"></div>
-                <div id="sgLastChecked" class="status-value" style="font-size: 0.8rem; color: var(--text-secondary);"></div>
+                <div id="sgLastChecked" class="last-checked"></div>
             </div>
             
             <div class="status-box">
                 <h2 class="status-label">US VPS</h2>
                 <div id="usStatus" class="status-value">Checking...</div>
                 <div id="usUptime" class="status-value"></div>
-                <div id="usLastChecked" class="status-value" style="font-size: 0.8rem; color: var(--text-secondary);"></div>
+                <div id="usLastChecked" class="last-checked"></div>
             </div>
         </div>
     </div>
 
     <script>
         // GitHub Pages will serve this from the raw.githubusercontent.com URL
-        const STATUS_API_URL = 'https://raw.githubusercontent.com/c-janith/Check-Vps-Status/main/vps_status.json';
+        const STATUS_API_URL = 'https://raw.githubusercontent.com/YourUsername/YourRepo/main/vps_status.json';
 
         async function checkVPSStatus() {
             try {
