@@ -1,0 +1,71 @@
+name: VPS Status Monitor
+
+on:
+  schedule:
+    # Run every 5 minutes
+    - cron: '*/5 * * * *'
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  check-vps-status:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v3
+      with:
+        python-version: '3.9'
+    
+    - name: Check VPS Status
+      env:
+        # Store these securely in GitHub Secrets
+        SG_VPS_URL: ${{ secrets.SG_VPS_URL }}
+        US_VPS_URL: ${{ secrets.US_VPS_URL }}
+      run: |
+        pip install requests
+        
+        python3 - << EOF
+        import requests
+        import json
+        from datetime import datetime
+        import os
+
+        def check_vps_status(url):
+            try:
+                response = requests.head(url, timeout=10)
+                return {
+                    'status': response.status_code == 200,
+                    'uptime': 'Checked Successfully',
+                    'last_checked': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                }
+            except Exception as e:
+                return {
+                    'status': False,
+                    'uptime': str(e),
+                    'last_checked': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                }
+
+        # Get URLs from environment variables
+        sg_url = os.environ.get('SG_VPS_URL')
+        us_url = os.environ.get('US_VPS_URL')
+
+        # Check VPS status
+        status = {
+            'singapore': check_vps_status(sg_url),
+            'us': check_vps_status(us_url)
+        }
+
+        # Write status to JSON file
+        with open('vps_status.json', 'w') as f:
+            json.dump(status, f, indent=2)
+        EOF
+
+    - name: Commit and Push Changes ```yaml
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add vps_status.json
+        git commit -m "Update VPS status"
+        git push
