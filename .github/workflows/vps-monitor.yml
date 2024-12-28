@@ -10,62 +10,128 @@ jobs:
     runs-on: ubuntu-latest
     
     permissions:
-      # Give the default GITHUB_TOKEN write permission
       contents: write
 
     steps:
     - uses: actions/checkout@v3
-    
+
     - name: Set up Python
       uses: actions/setup-python@v3
       with:
         python-version: '3.9'
     
+    - name: Install Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install requests urllib3
+
     - name: Check VPS Status
       env:
         SG_VPS_URL: ${{ secrets.SG_VPS_URL }}
         US_VPS_URL: ${{ secrets.US_VPS_URL }}
       run: |
-        pip install requests
-        
         python3 - << EOF
         import requests
         import json
         from datetime import datetime
         import os
+        import ssl
+        import socket
 
-        def check_vps_status(url):
+        def advanced_vps_status_check(url):
             try:
-                response = requests.head(url, timeout=10)
-                return {
-                    'status': response.status_code == 200,
-                    'uptime': 'Checked Successfully',
-                    'last_checked': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                }
-            except Exception as e:
+                # Detailed status checking
+                try:
+                    # Disable SSL verification for self-signed certificates
+                    ssl_context = ssl.create_default_context()
+                    ssl_context.check_hostname = False
+                    ssl_context.verify_mode = ssl.CERT_NONE
+
+                    # Extract host and port
+                    from urllib.parse import urlparse
+                    parsed_url = urlparse(url)
+                    host = parsed_url.hostname
+                    port = parsed_url.port or (443 if parsed_url.scheme == 'https' else 80)
+
+                    # Socket connection test
+                    sock = socket.create_connection((host, port), timeout=10)
+                    sock.close()
+                except (socket.error, socket.timeout) as socket_err:
+                    print(f"Socket Connection Error: {socket_err}")
+                    return {
+                        'status': False,
+                        'uptime': f'Socket Error: {socket_err}',
+                        'last_checked': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                        'error_details': str(socket_err)
+                    }
+
+                # HTTP Request Test
+                try:
+                    # Comprehensive request with multiple checks
+                    response = requests.head(
+                        url, 
+                        timeout=10, 
+                        verify=False,  # Disable SSL verification
+                        allow_redirects=True
+                    )
+
+                    # Detailed status evaluation
+                    return {
+                        'status': response.status_code in [200, 204, 301, 302],
+                        'uptime': f'HTTP Status: {response.status_code}',
+                        'last_checked': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                        'response_headers': dict(response.headers)
+                    }
+                except requests.RequestException as req_err:
+                    print(f"HTTP Request Error: {req_err}")
+                    return {
+                        'status': False,
+                        'uptime': f'Request Error: {req_err}',
+                        'last_checked': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                        'error_details': str(req_err)
+                    }
+
+            except Exception as general_err:
+                print(f"Unexpected Error: {general_err}")
                 return {
                     'status': False,
-                    'uptime': str(e),
-                    'last_checked': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                    'uptime': f'Unexpected Error: {general_err}',
+                    'last_checked': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                    'error_details': str(general_err)
                 }
+
+        # Suppress SSL warnings
+        import urllib3
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
         # Get URLs from environment variables
         sg_url = os.environ.get('SG_VPS_URL')
         us_url = os.environ.get('US_VPS_URL')
 
-        # Check VPS status
+        # Check VPS status with detailed logging
+        print(f"Checking Singapore VPS: {sg_url}")
+        sg_status = advanced_vps_status_check(sg_url)
+        print(f"Singapore VPS Status: {sg_status}")
+
+        print(f"Checking US VPS: {us_url}")
+        us_status = advanced_vps_status_check(us_url)
+        print(f"US VPS Status: {us_status}")
+
+        # Prepare status dictionary
         status = {
-            'singapore': check_vps_status(sg_url),
-            'us': check_vps_status(us_url)
+            'singapore': sg_status,
+            'us': us_status
         }
 
-        # Write status to JSON file
+        # Write status to JSON file with indentation
         with open('vps_status.json', 'w') as f:
             json.dump(status, f, indent=2)
-        EOF
+
+        # Print final status for workflow log
+        print("VPS Status Check Complete")
+EOF
 
     - name: Commit and Push Changes
-      # Use GITHUB_TOKEN for authentication
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
