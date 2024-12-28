@@ -1,12 +1,12 @@
 {
   "singapore": {
-    "status": false,
-    "uptime": "Status Code: 404",
-    "last_checked": "2024-12-28 14:39:33"
+    "status": true,
+    "uptime": "Status Code: 200",
+    "last_checked": "2024-12-28 14:57:26"
   },
   "us": {
-    "status": false,
-    "uptime": "Status Code: 404",
-    "last_checked": "2024-12-28 14:39:33"
+    "status": true,
+    "uptime": "Status Code: 200",
+    "last_checked": "2024-12-28 14:57:26"
   }
 }
