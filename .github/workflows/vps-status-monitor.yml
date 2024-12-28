@@ -26,9 +26,9 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install requests urllib3
+        pip install requests
 
-    - name: Verbose VPS Status Check
+    - name: Check VPS Status
       env:
         SG_VPS_URL: ${{ secrets.SG_VPS_URL }}
         US_VPS_URL: ${{ secrets.US_VPS_URL }}
@@ -38,84 +38,49 @@ jobs:
         import json
         from datetime import datetime
         import os
-        import traceback
-        import urllib3
 
-        # Disable SSL warnings
-        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
-        def advanced_vps_status_check(url):
-            print(f"\n--- Checking URL: {url} ---")
+        def check_vps_status(url):
             try:
-                # Comprehensive request with detailed error handling
+                # Attempt to connect with a longer timeout
                 response = requests.get(
                     url, 
-                    timeout=15,  # Increased timeout
-                    verify=False,  # Disable SSL verification
-                    allow_redirects=True
+                    timeout=10,  # 10 seconds timeout
+                    allow_redirects=True,
+                    verify=False  # Disable SSL verification if needed
                 )
-
-                print(f"Full Response Details:")
-                print(f"Status Code: {response.status_code}")
-                print("Response Headers:")
-                for key, value in response.headers.items():
-                    print(f"  {key}: {value}")
                 
-                print("Response Content:")
-                print(response.text[:500])  # Print first 500 characters
-
+                # Consider status codes that indicate a successful connection
+                is_online = response.status_code in [200, 204, 301, 302]
+                
                 return {
-                    'status': response.status_code in [200, 204, 301, 302],
-                    'uptime': f'HTTP Status: {response.status_code}',
-                    'last_checked': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                    'response_details': {
-                        'status_code': response.status_code,
-                        'headers': dict(response.headers)
-                    }
+                    'status': is_online,
+                    'uptime': f'Status Code: {response.status_code}',
+                    'last_checked': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 }
-            except requests.RequestException as req_err:
-                print(f"Request Error: {req_err}")
-                traceback.print_exc()
+            except Exception as e:
+                # Any exception means the VPS is likely offline
                 return {
                     'status': False,
-                    'uptime': f'Request Error: {req_err}',
-                    'last_checked': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                    'error_details': str(req_err)
-                }
-            except Exception as general_err:
-                print(f"Unexpected Error: {general_err}")
-                traceback.print_exc()
-                return {
-                    'status': False,
-                    'uptime': f'Unexpected Error: {general_err}',
-                    'last_checked': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                    'error_details': str(general_err)
+                    'uptime': str(e),
+                    'last_checked': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 }
 
         # Get URLs from environment variables
         sg_url = os.environ.get('SG_VPS_URL')
         us_url = os.environ.get('US_VPS_URL')
 
-        print("Environment Variables:")
-        print(f"Singapore VPS URL: {sg_url}")
-        print(f"US VPS URL: {us_url}")
-
-        # Check VPS status with detailed logging
-        sg_status = advanced_vps_status_check(sg_url)
-        us_status = advanced_vps_status_check(us_url)
-
-        # Prepare status dictionary
+        # Check VPS status
         status = {
-            'singapore': sg_status,
-            'us': us_status
+            'singapore': check_vps_status(sg_url),
+            'us': check_vps_status(us_url)
         }
 
-        # Write status to JSON file with indentation
+        # Write status to JSON file
         with open('vps_status.json', 'w') as f:
             json.dump(status, f, indent=2)
 
-        print("\n--- VPS Status Check Complete ---")
-EOF
+        print("VPS Status Check Complete")
+        EOF
 
     - name: Commit and Push Changes
       run: |
